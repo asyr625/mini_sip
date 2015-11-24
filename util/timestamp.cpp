@@ -1,0 +1,134 @@
+#include "timestamp.h"
+
+#include <string.h>
+
+Timestamp ts;
+
+using namespace std;
+
+#define MAX_TIMESTAMPS 256
+
+
+string id_names[25] = { "invite_start", "invite_end", "mikey_start", "mikey_end", "ringing", "packet_in",
+                        "packet_out", "tls_start", "tls_end", "dh_precompute_start", "dh_precompute_end", "mikey_create_start",
+                        "mikey_create_end", "rand_start", "rand_end", "sign_start", "sign_end", "auth_start",
+                        "auth_end",  "mikey_parse_start", "mikey_parse_end", "tgk_start", "tgk_end", "user_accept" ,"tmp"};
+
+#ifdef WIN32
+Timestamp::Timestamp(){}
+Timestamp::Timestamp(const Timestamp &){}
+#else
+Timestamp::Timestamp()
+{
+    tz = new struct timezone;
+    values = new struct timeval[ MAX_TIMESTAMPS ];
+    strings= new string[ MAX_TIMESTAMPS + 1];
+    ids = new int32_t[MAX_TIMESTAMPS];
+    index = 0;
+    auto_id=-1;
+}
+
+Timestamp::Timestamp(const Timestamp &t):
+    index(t.index),
+    auto_id(t.auto_id),
+    start_time(t.start_time),
+    stop_time(t.stop_time),
+    filename(t.filename)
+{
+    tz = new struct timezone;
+    memcpy(tz, t.tz, sizeof(struct timezone) );
+
+    values = new struct timeval[ MAX_TIMESTAMPS ];
+    memcpy(values, t.values, MAX_TIMESTAMPS* sizeof(struct timeval) );
+
+    strings = new string[ MAX_TIMESTAMPS + 1];
+    for (int i=0; i<MAX_TIMESTAMPS; i++)
+        strings[i]=t.strings[i];
+
+    ids = new int32_t[MAX_TIMESTAMPS];
+    memcpy(ids, t.ids, MAX_TIMESTAMPS*sizeof(int32_t) );
+}
+#endif
+
+#ifdef WIN32
+Timestamp::~Timestamp(){}
+#else
+Timestamp::~Timestamp()
+{
+    delete tz;
+    delete [] values;
+    delete [] strings;
+    delete [] ids;
+}
+#endif
+
+#ifdef WIN32
+void Timestamp::save( uint32_t id ){}
+#else
+void Timestamp::save( uint32_t id ){
+#if 0
+    ids[index] = id;
+    gettimeofday( &values[index], tz );
+    index = ( index + 1 ) % MAX_TIMESTAMPS;
+    //values[ index++ ] = ((uint64_t)tv->tv_sec << 32) |tv->tv_usec;
+#endif
+}
+#endif
+
+#ifdef WIN32
+void Timestamp::save( string s){}
+#else
+void Timestamp::save( string s)
+{
+#if 0
+    ids[index] = auto_id--;
+    if( -(auto_id+1) > MAX_TIMESTAMPS )
+        auto_id = -1;
+    //	cerr << "Placing string "<< s << " on index " << -(auto_id+1) << endl;
+    strings[-(auto_id+1)] = s;
+    //	cerr << "strings[1]="<<strings[1]<< endl;
+    gettimeofday( &values[index], tz );
+    index = ( index + 1 ) % MAX_TIMESTAMPS;
+    //values[ index++ ] = ((uint64_t)tv->tv_sec << 32) |tv->tv_usec;
+#endif
+}
+#endif
+
+#ifdef WIN32
+void Timestamp::print() {}
+#else
+void Timestamp::print()
+{
+    print(FILE_NAME);
+}
+#endif
+
+#ifdef WIN32
+void Timestamp::print(std::string fileName){}
+#else
+void Timestamp::print(std::string fileName)
+{
+    uint32_t i;
+    struct timeval temp;
+    ofstream file( fileName.c_str() );
+    file << "Saved timestamps: " << endl;
+    temp = values[0];
+    for( i = 0 ; i < index && i < MAX_TIMESTAMPS; i++ )
+    {
+        //		cerr << "using string index "<< -ids[i]<< endl;
+        if (ids[i]<0){
+            string val = strings[-ids[i]];
+            //			cerr << "will write "<<val<< endl;
+            file << "  " << val << ":\t"
+                 << values[i].tv_sec << ":\t"
+                 << values[i].tv_usec <<"\t"
+                 << (values[i].tv_sec - temp.tv_sec)*1000000 + values[i].tv_usec - temp.tv_usec <<endl;
+        }else
+            file << "  " << id_names[ ids[i] ] << ":\t"
+                 << values[i].tv_sec << ":\t"
+                 << values[i].tv_usec <<"\t"
+                 << (values[i].tv_sec - temp.tv_sec)*1000000 + values[i].tv_usec - temp.tv_usec <<endl;
+        temp = values[i];
+    }
+}
+#endif
